@@ -16,7 +16,7 @@ int main(int argc, char *argv[])
     long time_usec_end;
     long elapsed_time;
     pid_t pids[nr_filhos];
-    int status;
+    int status=0;
     char res[40];
     pid_t wait_lastPid;
     get_time_useconds(&time_usec_begin);
@@ -33,10 +33,8 @@ int main(int argc, char *argv[])
 
     MUTATION_ARRAY *mutation_array = (MUTATION_ARRAY *)calloc(1, sizeof(MUTATION_ARRAY));
     GENOME *g = gl->phead;
-    printf("Parent: %d\n", getppid());
     for (int i = 0; i < nr_filhos; ++i)
     {
-        printf("Filho[%d](pid):%d....Parent Pid:%d\n",i+1,getpid(),getppid());
         if(i==nr_filhos){
              wait_lastPid=getpid();
         }
@@ -47,7 +45,10 @@ int main(int argc, char *argv[])
             exit(1);
         }
         else if (pids[i] == 0){
-          
+            if(i==0){
+                printf("Parent: %d\n", getppid());
+            }
+            printf("Filho[%d](pid):%d....Parent Pid:%d\n",i+1,getpid(),getppid());
             for (int l = 0; l < i; l++){
                 g = g->pnext;
             }
@@ -63,10 +64,10 @@ int main(int argc, char *argv[])
                 }
             }
 
-           exit(EXIT_SUCCESS);
+           exit(0);
         }
     }
-    waitpid(wait_lastPid, &status, 0);
+    while ((wait_lastPid = wait(&status)) > 0);
     get_time_useconds(&time_usec_end);
     elapsed_time = (long)(time_usec_end - time_usec_begin);
     printf("Total time = %ld microseconds\n", elapsed_time);
