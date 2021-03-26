@@ -11,12 +11,14 @@
 int main(int argc, char *argv[])
 {
     int nr_filhos = atoi(argv[1]);
-    printf("%d\n", nr_filhos);
+    printf("Nr de Filhos:%d\n", nr_filhos);
     long time_usec_begin;
     long time_usec_end;
     long elapsed_time;
     pid_t pids[nr_filhos];
-
+    int status;
+    char res[40];
+    pid_t wait_lastPid;
     get_time_useconds(&time_usec_begin);
 
     GENOME_LIST *gl = (GENOME_LIST *)calloc(1, sizeof(GENOME_LIST));
@@ -31,36 +33,40 @@ int main(int argc, char *argv[])
 
     MUTATION_ARRAY *mutation_array = (MUTATION_ARRAY *)calloc(1, sizeof(MUTATION_ARRAY));
     GENOME *g = gl->phead;
-    for (i = 0; i < nr_filhos; ++i)
+    printf("Parent: %d\n", getppid());
+    for (int i = 0; i < nr_filhos; ++i)
     {
+        printf("Filho[%d](pid):%d....Parent Pid:%d\n",i+1,getpid(),getppid());
+        if(i==nr_filhos){
+             wait_lastPid=getpid();
+        }
+        sprintf(res,"result/mutations%d.txt", i+1);
         if ((pids[i] = fork()) < 0)
         {
             perror("fork");
             exit(1);
         }
         else if (pids[i] == 0){
-        
+          
             for (int l = 0; l < i; l++){
-            
                 g = g->pnext;
             }
 
+            
             while (g != NULL) {
-           
-
                 genome_cmp(g, mutation_array);
-                save_mutation_array(mutation_array, "mutations.txt", 0);
-                free_mutations(mutation_array);
+                save_mutation_array(mutation_array, res , 0);
+                free_mutations(mutation_array); 
                 
-                for (int j = 0; j < i; j++){
+                for (int j = 0; j < nr_filhos; j++){
                     g = g->pnext;
                 }
             }
 
-            exit(0);
+           exit(EXIT_SUCCESS);
         }
     }
-
+    waitpid(wait_lastPid, &status, 0);
     get_time_useconds(&time_usec_end);
     elapsed_time = (long)(time_usec_end - time_usec_begin);
     printf("Total time = %ld microseconds\n", elapsed_time);
