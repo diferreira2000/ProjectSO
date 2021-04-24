@@ -17,57 +17,65 @@
 #include <math.h>
 #include <sys/time.h>
 #include <math.h>
+#include <signal.h>
 
-#define MAX100    100
-#define BUF_SIZE  4096
+#define MAX100 100
+#define BUF_SIZE 4096
 #define DICT_SIZE 11
 
-typedef struct gene {
+typedef struct gene
+{
     char name[MAX100];
-    char * seq;
-}GENE;
+    char *seq;
+} GENE;
 
-typedef struct genome {
+typedef struct genome
+{
     char name[MAX100];
-    GENE * genes;
+    GENE *genes;
     int n_genes;
     int size_genes;
-    struct genome * pnext;
-    struct genome * pprev;
-}GENOME;
+    struct genome *pnext;
+    struct genome *pprev;
+} GENOME;
 
-typedef struct genome_list {
-    GENOME * phead;
-    GENOME * ptail;
+typedef struct genome_list
+{
+    GENOME *phead;
+    GENOME *ptail;
     long n_genomes;
-}GENOME_LIST;
+} GENOME_LIST;
 
-typedef struct gene_dict {
+typedef struct gene_dict
+{
     char name[MAX100];
     char prot[MAX100];
     int rows;
     int cols;
     int padding;
-}GENE_DICT;
+} GENE_DICT;
 
-typedef struct int_array {
-    int * arr;
+typedef struct int_array
+{
+    int *arr;
     int n;
     int size;
-}INT_ARRAY;
+} INT_ARRAY;
 
-typedef struct mutation {
+typedef struct mutation
+{
     char genome_a[MAX100];
     char genome_b[MAX100];
     char gene[MAX100];
     INT_ARRAY seq_mutations;
-}MUTATION;
+} MUTATION;
 
-typedef struct mutation_array {
+typedef struct mutation_array
+{
     int n_mutations;
     int size_mutations;
-    MUTATION * mutations;
-}MUTATION_ARRAY;
+    MUTATION *mutations;
+} MUTATION_ARRAY;
 
 GENE_DICT gd[] = {{"gene=ORF1ab", "ORF1ab", 115, 115, 7},
                   {"gene=S", "surface", 62, 62, 22},
@@ -81,22 +89,25 @@ GENE_DICT gd[] = {{"gene=ORF1ab", "ORF1ab", 115, 115, 7},
                   {"gene=N", "nucleocapsid", 36, 36, 36},
                   {"gene=ORF10", "ORF10", 11, 11, 4}};
 
-GENE * find_gene (GENOME * genome, char * gene_name);
-void insert_int_array (INT_ARRAY * int_array, int element);
-INT_ARRAY * gene_cmp (GENE g1, GENE g2);
-void insert_mutation (MUTATION_ARRAY * mutation_array, char * genome_a, char * genome_b, char * gene, INT_ARRAY * gene_mut);
-void genome_cmp (GENOME * genome, MUTATION_ARRAY * mutation_array);
-void read_genomes (GENOME_LIST * gl, char * path);
-void remove_white_spaces (char * str);
-void insert_gene (GENOME * genome, GENE * gene);
-char * find_protein_name (char * protein);
-GENOME * find_genome (GENOME_LIST * gl, char * g_id);
-void insert_genome (GENOME_LIST * gl, GENOME * g);
-void print_genome (GENOME genome);
-GENE_DICT * find_gene_dict (char * name);
-int get_gene_padding (char * name);
-GENE * create_gene (char * name, char * seq);
-void parse_genome (GENOME_LIST * gl, char * cds);
-long get_time_useconds(long * time_usec);
-void save_mutation_array (MUTATION_ARRAY * mutation_array, char * path, int detail);
-void free_mutations(MUTATION_ARRAY * mutation_array);
+GENE *find_gene(GENOME *genome, char *gene_name);
+void insert_int_array(INT_ARRAY *int_array, int element);
+INT_ARRAY *gene_cmp(GENE g1, GENE g2);
+void insert_mutation(MUTATION_ARRAY *mutation_array, char *genome_a, char *genome_b, char *gene, INT_ARRAY *gene_mut);
+void genome_cmp(GENOME *genome, MUTATION_ARRAY *mutation_array);
+void read_genomes(GENOME_LIST *gl, char *path);
+void remove_white_spaces(char *str);
+void insert_gene(GENOME *genome, GENE *gene);
+char *find_protein_name(char *protein);
+GENOME *find_genome(GENOME_LIST *gl, char *g_id);
+void insert_genome(GENOME_LIST *gl, GENOME *g);
+void print_genome(GENOME genome);
+GENE_DICT *find_gene_dict(char *name);
+int get_gene_padding(char *name);
+GENE *create_gene(char *name, char *seq);
+void parse_genome(GENOME_LIST *gl, char *cds);
+long get_time_useconds(long *time_usec);
+void save_mutation_array(MUTATION_ARRAY *mutation_array, char *path, int detail,int pid);
+void save_mutation_array_og(char *temp, char *path);
+void free_mutations(MUTATION_ARRAY *mutation_array);
+void handler(int signum);
+void save_mutation_array_pipe(MUTATION_ARRAY *mutation_array, char *path, int detail, int pid,int pipefd);
