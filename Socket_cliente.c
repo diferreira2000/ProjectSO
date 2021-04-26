@@ -7,25 +7,56 @@
  */
 
 #include "main.h"
+#include "sys/socket.h"
+#include "sys/types.h"
+#include "sys/uio.h"
+#include <sys/un.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
+#include <string.h>
+#include <fcntl.h>
+#define TAMSG 100
+char *socket_path= "/tmp/socket";
+#define BUF_SIZE 4096 /*block transfer size*/
+
+
 
 int main(int argc, char *argv[])
 {
+    char tmp[TAMSG];
+    char msg[375] = "";
     int nr_filhos = atoi(argv[1]);
     printf("Nr de Filhos:%d\n", nr_filhos);
     long time_usec_begin;
     long time_usec_end;
     long elapsed_time;
     pid_t pids[nr_filhos];
-    int status = 0;
-    char res[40];
-    pid_t wait_lastPid;
     get_time_useconds(&time_usec_begin);
-
-#define TAMSG 100
-    int fds[2];
-    char tmp[TAMSG];
-    char msg[375] = "";
-
+  //socket
+    int c, uds, bytes;
+    char buf[BUF_SIZE];
+    struct sockaddr_un channel; /*Unix Domain Socket*/
+    if (argc != 2) {
+        printf("Usage: client file-name\n");
+        exit(1);
+    }
+    
+    if ( (uds = socket(AF_UNIX, SOCK_STREAM, 0)) == -1) {
+        perror("socket error");
+        exit(1);
+    }
+    memset(&channel, 0, sizeof(channel));
+    channel.sun_family= AF_UNIX;
+    strncpy(channel.sun_path, socket_path, sizeof(channel.sun_path)-1);
+    
+    if (connect(uds, (struct sockaddr*)&channel, sizeof(channel)) == -1) {
+        perror("connect error");
+        exit(1);
+    }
+     /* Connection is now established. Send file name including 0 byte at end. */
+   // write(uds, argv[1], strlen(argv[1])+1);
+    
     GENOME_LIST *gl = (GENOME_LIST *)calloc(1, sizeof(GENOME_LIST));
 
     read_genomes(gl, "input/cds.fna");
@@ -42,22 +73,22 @@ int main(int argc, char *argv[])
    
     for (int i = 0; i < nr_filhos; ++i)
     {
-
-        if (pipe(fds) < 0)
-            exit(-1); //cria o pipe
-
-        if (i == nr_filhos)
-        {
-            wait_lastPid = getpid();
-        }
-       
+   
         if ((pids[i] = fork()) < 0)
         {
             perror("fork");
             exit(1);
         }
-        else if (pids[i] == 0)
+        else if (pids[i] == 0) //processo filho
         {
+
+            /*Go get the file and write it to standard output*/
+            while(nr_filhos){
+                bytes= read(uds, buf, BUF_SIZE); /*read from socket*/
+                if(bytes <= 0) exit(0); /* check for end of file */
+                write(1, buf, bytes); /*write to standerd output*/
+            }
+
             if (i == 0)
             {
                 printf("Parent: %d\n", getppid());
@@ -67,19 +98,11 @@ int main(int argc, char *argv[])
             {
                 g = g->pnext;
             }
-            close(fds[0]);
+            
             while (g != NULL)
             {
                 genome_cmp(g, mutation_array);
-                kill(pids[i], SIGUSR1);
-
-               
-                save_mutation_array(mutation_array, res, 0);
-                sprintf(msg, "%d|%s|%s|%s|%d\n", getpid(), mutation_array->mutations->genome_a, mutation_array->mutations->genome_b, mutation_array->mutations->gene,
-                        mutation_array->n_mutations);
-
-                write(fds[1], msg, sizeof(msg)); //filho escreve n e aqui
-
+                save_mutation_array(mutation_array, res, 0,getpid());
                 free_mutations(mutation_array);
 
                 for (int j = 0; j < nr_filhos; j++)
@@ -87,31 +110,21 @@ int main(int argc, char *argv[])
                     g = g->pnext;
                 }
             }
-            close(fds[1]);
+           
             exit(0);
         }
-    }
-    close(fds[1]);
-    char res1[] = "result/pipe.txt";
-    while (read(fds[0], tmp, sizeof(tmp)) > 0)
+    } 
+   
+    for (int i = 0; i < nr_filhos; i++)
     {
-        save_mutation_array_og(tmp, res1);
+        wait(NULL);
     }
-
-    while ((wait_lastPid = wait(&status)) > 0)
-        ;
+   
     printf("%s\n", tmp);
     get_time_useconds(&time_usec_end);
     elapsed_time = (long)(time_usec_end - time_usec_begin);
     printf("Total time = %ld microseconds\n", elapsed_time);
-    close(fds[0]);
     return 0;
-}
-
-void handler(int signum)
-{
-    if (signum == SIGUSR1)
-        printf("Comparação Concluída!\n");
 }
 
 /**
@@ -516,12 +529,33 @@ void free_mutations(MUTATION_ARRAY *mutation_array)
     mutation_array->n_mutations = mutation_array->size_mutations = 0;
     mutation_array->mutations = NULL;
 }
-void save_mutation_array_og(char temp[BUF_SIZE], char *path)
+
+
+void save_mutation_array_pipe(MUTATION_ARRAY *mutation_array, char *path, int detail, int pid,int socketfd)
 {
-    //abrir ficheiro
-    FILE *fp = fopen(path, "a");
-    //escrever no ficheiro
-    fprintf(fp, "%s", temp);
-    //fechar ficheiro
-    fclose(fp);
+   
+    char *buf = (char *)malloc(sizeof(char) * 1000000);
+    int i;
+    for (i = 0; i < mutation_array->n_mutations; i++)
+    {
+
+        MUTATION *aux = mutation_array->mutations + i;
+        sprintf(buf, "%d|%s|%s|%s|%d\n", getpid(), mutation_array->mutations->genome_a, mutation_array->mutations->genome_b, mutation_array->mutations->gene,mutation_array->n_mutations);
+       /*
+        if (detail)
+        {
+            int j;
+            for (j = 0; j < aux->seq_mutations.n; j++)
+            {
+                sprintf(buf, "%s%d;", buf, aux->seq_mutations.arr[j]);
+            }
+        }
+*/
+        
+        write(pipefd, buf, strlen(buf)+1);
+    
+    }
+    
+    free(buf);
 }
+
